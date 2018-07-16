@@ -238,21 +238,59 @@ public:
      */
     StatusCode PCD_CalculateCRC(uint8_t *data, uint8_t length, uint8_t *result);
 
-    /////////////////////////////////////////////////////////////////////////////////////
-    // Functions for manipulating the MFRC522
-    /////////////////////////////////////////////////////////////////////////////////////
+    /**
+     * @brief Initialize the MFRC522 chip.
+     */
     void PCD_Init();
+
+    /**
+     * @brief Initialize the MFRC522 chip.
+     *
+     * @param chipSelectPin      Arduino pin connected to MFRC522's SPI slave select input (Pin 24, NSS, active low)
+     * @param resetPowerDownPin  Arduino pin connected to MFRC522's reset and power down input (Pin 6, NRSTPD, active low)
+     */
     void PCD_Init(uint8_t chipSelectPin, uint8_t resetPowerDownPin);
+
+    /**
+     * @brief Perform a soft reset on the MFRC522 chip and wait for it to be ready again.
+     */
     void PCD_Reset();
+
+    /**
+     * Turns the antenna on by enabling pins TX1 and TX2.
+     * After a reset these pins are disabled.
+     */
     void PCD_AntennaOn();
+
+    /**
+     * Turns the antenna off by disabling pins TX1 and TX2.
+     */
     void PCD_AntennaOff();
+
+    /**
+     * Get the current MFRC522 Receiver Gain (RxGain[2:0]) value.
+     * See 9.3.3.6 / table 98 in http://www.nxp.com/documents/data_sheet/MFRC522.pdf
+     * NOTE: Return value scrubbed with (0x07<<4)=01110000b as RCFfgReg may use reserved bits.
+     * 
+     * @return Value of the RxGain, scrubbed to the 3 bits used.
+     */
     uint8_t PCD_GetAntennaGain();
+
+    /**
+     * Set the MFRC522 Receiver Gain (RxGain) to value specified by given mask.
+     * See 9.3.3.6 / table 98 in http://www.nxp.com/documents/data_sheet/MFRC522.pdf
+     * NOTE: Given mask is scrubbed with (0x07<<4)=01110000b as RCFfgReg may use reserved bits.
+     */
     void PCD_SetAntennaGain(uint8_t mask);
+
+    /**
+     * Performs a self-test of the MFRC522
+     * See 16.1.1 in http://www.nxp.com/documents/data_sheet/MFRC522.pdf
+     * 
+     * @return Whether or not the test passed. Or false if no firmware reference is available.
+     */
     bool PCD_PerformSelfTest();
 
-    /////////////////////////////////////////////////////////////////////////////////////
-    // Power control functions
-    /////////////////////////////////////////////////////////////////////////////////////
     void PCD_SoftPowerDown();
     void PCD_SoftPowerUp();
 
@@ -265,35 +303,147 @@ public:
     StatusCode PICC_WakeupA(uint8_t *bufferATQA, uint8_t *bufferSize);
     StatusCode PICC_REQA_or_WUPA(uint8_t command, uint8_t *bufferATQA, uint8_t *bufferSize);
     virtual StatusCode PICC_Select(Uid *uid, uint8_t validBits = 0);
+
+    /**
+     * Instructs a PICC in state ACTIVE(*) to go to state HALT.
+     *
+     * @return STATUS_OK on success, STATUS_??? otherwise.
+     */
     StatusCode PICC_HaltA();
 
     /////////////////////////////////////////////////////////////////////////////////////
     // Functions for communicating with MIFARE PICCs
     /////////////////////////////////////////////////////////////////////////////////////
     StatusCode PCD_Authenticate(uint8_t command, uint8_t blockAddr, MIFARE_Key *key, Uid *uid);
+
+    /**
+     * Used to exit the PCD from its authenticated state.
+     * Remember to call this function after communicating with an authenticated PICC - otherwise no new communications can start.
+     */
     void PCD_StopCrypto1();
     StatusCode MIFARE_Read(uint8_t blockAddr, uint8_t *buffer, uint8_t *bufferSize);
     StatusCode MIFARE_Write(uint8_t blockAddr, uint8_t *buffer, uint8_t bufferSize);
+
+    /**
+     * Writes a 4 byte page to the active MIFARE Ultralight PICC.
+     * @param The page (2-15) to write to.
+     * @param the 4 bytes to write
+     * @param Buffer size, must be at least 4 bytes. Exactly 4 bytes are written.
+     *
+     * @return STATUS_OK on success, STATUS_??? otherwise.
+     */
     StatusCode MIFARE_Ultralight_Write(uint8_t page, uint8_t *buffer, uint8_t bufferSize);
+
+    /**
+     * MIFARE Decrement subtracts the delta from the value of the addressed block, and stores the result in a volatile memory.
+     *
+     * For MIFARE Classic only. The sector containing the block must be authenticated before calling this function.
+     * Only for blocks in "value block" mode, ie with access bits [C1 C2 C3] = [110] or [001].
+     * Use MIFARE_Transfer() to store the result in a block.
+     *
+     * @param blockAddr  The block number
+     * @param delta      The number to subtract from the value of the block.
+     * @return STATUS_OK on success, STATUS_??? otherwise.
+     */
     StatusCode MIFARE_Decrement(uint8_t blockAddr, int32_t delta);
+
+    /**
+     * MIFARE Increment adds the delta to the value of the addressed block, and stores the result in a volatile memory.
+     * For MIFARE Classic only. The sector containing the block must be authenticated before calling this function.
+     * Only for blocks in "value block" mode, ie with access bits [C1 C2 C3] = [110] or [001].
+     * Use MIFARE_Transfer() to store the result in a block.
+     *
+     * @param blockAddr  The block number
+     * @param delta      The number to subtract from the value of the block.
+     * @return STATUS_OK on success, STATUS_??? otherwise.
+     */
     StatusCode MIFARE_Increment(uint8_t blockAddr, int32_t delta);
+
+    /**
+     * MIFARE Restore copies the value of the addressed block into a volatile memory.
+     * For MIFARE Classic only. The sector containing the block must be authenticated before calling this function.
+     * Only for blocks in "value block" mode, ie with access bits [C1 C2 C3] = [110] or [001].
+     * Use MIFARE_Transfer() to store the result in a block.
+     *
+     * @return STATUS_OK on success, STATUS_??? otherwise.
+     */
     StatusCode MIFARE_Restore(uint8_t blockAddr);
+
+    /**
+     * MIFARE Transfer writes the value stored in the volatile memory into one MIFARE Classic block.
+     * For MIFARE Classic only. The sector containing the block must be authenticated before calling this function.
+     * Only for blocks in "value block" mode, ie with access bits [C1 C2 C3] = [110] or [001].
+     *
+     * @return STATUS_OK on success, STATUS_??? otherwise.
+     */
     StatusCode MIFARE_Transfer(uint8_t blockAddr);
+
+    /**
+     * Helper routine to read the current value from a Value Block.
+     *
+     * Only for MIFARE Classic and only for blocks in "value block" mode, that
+     * is: with access bits [C1 C2 C3] = [110] or [001]. The sector containing
+     * the block must be authenticated before calling this function. 
+     *
+     * @param[in]   blockAddr   The block (0x00-0xff) number.
+     * @param[out]  value       Current value of the Value Block.
+     * @return STATUS_OK on success, STATUS_??? otherwise.
+     */
     StatusCode MIFARE_GetValue(uint8_t blockAddr, int32_t *value);
+
+    /**
+     * Helper routine to write a specific value into a Value Block.
+     *
+     * Only for MIFARE Classic and only for blocks in "value block" mode, that
+     * is: with access bits [C1 C2 C3] = [110] or [001]. The sector containing
+     * the block must be authenticated before calling this function. 
+     *
+     * @param[in]   blockAddr   The block (0x00-0xff) number.
+     * @param[in]   value       New value of the Value Block.
+     * @return STATUS_OK on success, STATUS_??? otherwise.
+     */
     StatusCode MIFARE_SetValue(uint8_t blockAddr, int32_t value);
+
+    /**
+     * Authenticate with a NTAG216.
+     *
+     * Only for NTAG216. First implemented by Gargantuanman.
+     *
+     * @param   passWord   password.
+     * @param   pACK       result success???.
+     * @return STATUS_OK on success, STATUS_??? otherwise.
+     */
     StatusCode PCD_NTAG216_AUTH(uint8_t *passWord, uint8_t pACK[]);
 
-    /////////////////////////////////////////////////////////////////////////////////////
-    // Support functions
-    /////////////////////////////////////////////////////////////////////////////////////
+    /**
+     * @brief Wrapper for MIFARE protocol communication.
+     *
+     * Adds CRC_A, executes the Transceive command and checks that the response is MF_ACK or a timeout.
+     *     ///< Pointer to the data to transfer to the FIFO. Do NOT include the CRC_A.
+     *       ///< Number of bytes in sendData.
+     *  ///< True => A timeout is also success
+     *
+     * @return STATUS_OK on success, STATUS_??? otherwise.
+     */
     StatusCode PCD_MIFARE_Transceive(uint8_t *sendData, uint8_t sendLen, bool acceptTimeout = false);
-    static PICC_Type PICC_GetType(uint8_t sak);
 
-    // Support functions for debuging - proxy for MFRC522Debug to keep backwarts compatibility
-    static const __FlashStringHelper *GetStatusCodeName(StatusCode code);
-    static const __FlashStringHelper *PICC_GetTypeName(PICC_Type type);
+    /**
+     * @brief Translates the SAK (Select Acknowledge) to a PICC type.
+     *
+     * @param sak The SAK byte returned from PICC_Select().
+     */
+    PICC_Type PICC_GetType(uint8_t sak);
 
-    // Advanced functions for MIFARE
+    /**
+     * @brief Calculate the bit pattern needed for the specified access bits.
+     *
+     * In the [C1 C2 C3] tuples C1 is MSB (=4) and C3 is LSB (=1).
+     * @param accessBitBuffer  Pointer to byte 6, 7 and 8 in the sector trailer. Bytes [0..2] will be set.
+     * @param g0               Access bits [C1 C2 C3] for block 0 (for sectors 0-31) or blocks 0-4 (for sectors 32-39)
+     * @param g1               Access bits C1 C2 C3] for block 1 (for sectors 0-31) or blocks 5-9 (for sectors 32-39)
+     * @param g2               Access bits C1 C2 C3] for block 2 (for sectors 0-31) or blocks 10-14 (for sectors 32-39)
+     * @param g3               Access bits C1 C2 C3] for the sector trailer, block 3 (for sectors 0-31) or block 15 (for sectors 32-39)
+     */
     void MIFARE_SetAccessBits(uint8_t *accessBitBuffer, uint8_t g0, uint8_t g1, uint8_t g2, uint8_t g3);
 protected:
     // Pins

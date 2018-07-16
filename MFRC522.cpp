@@ -1,13 +1,5 @@
 #include "MFRC522.hpp"
 namespace MFRC {
-/////////////////////////////////////////////////////////////////////////////////////
-// Functions for setting up the Arduino
-/////////////////////////////////////////////////////////////////////////////////////
-
-
-/////////////////////////////////////////////////////////////////////////////////////
-// Basic interface functions for communicating with the MFRC522
-/////////////////////////////////////////////////////////////////////////////////////
 
 void MFRC522::PCD_WriteRegister(PCDRegister reg, uint8_t value)
 {
@@ -93,7 +85,7 @@ StatusCode MFRC522::PCD_CalculateCRC(uint8_t *data, uint8_t length, uint8_t *res
     PCD_WriteRegister(FIFOLevelReg, 0x80);          // FlushBuffer = 1, FIFO initialization
     PCD_WriteRegister(FIFODataReg, length, data);   // Write data to the FIFO
     PCD_WriteRegister(CommandReg, PCD_CalcCRC);     // Start the calculation
-    
+
     // Wait for the CRC calculation to complete. Each iteration of the while-loop takes 17.73μs.
     // TODO check/modify for other architectures than Arduino Uno 16bit
 
@@ -113,21 +105,18 @@ StatusCode MFRC522::PCD_CalculateCRC(uint8_t *data, uint8_t length, uint8_t *res
     return STATUS_TIMEOUT;
 }
 
-/**
- * Initializes the MFRC522 chip.
- */
 void MFRC522::PCD_Init() {
     bool hardReset = false;
 
     // Set the chipSelectPin as digital output, do not select the slave yet
     pinMode(_chipSelectPin, OUTPUT);
     digitalWrite(_chipSelectPin, HIGH);
-    
+
     // If a valid pin number has been set, pull device out of power down / reset state.
     if (_resetPowerDownPin != UNUSED_PIN) {
         // First set the resetPowerDownPin as digital input, to check the MFRC522 power down mode.
         pinMode(_resetPowerDownPin, INPUT);
-    
+
         if (digitalRead(_resetPowerDownPin) == LOW) {   // The MFRC522 chip is in power down mode.
             pinMode(_resetPowerDownPin, OUTPUT);        // Now set the resetPowerDownPin as digital output.
             digitalWrite(_resetPowerDownPin, HIGH);     // Exit power down mode. This triggers a hard reset.
@@ -140,7 +129,7 @@ void MFRC522::PCD_Init() {
     if (!hardReset) { // Perform a soft reset if we haven't triggered a hard reset above.
         PCD_Reset();
     }
-    
+
     // Reset baud rates
     PCD_WriteRegister(TxModeReg, 0x00);
     PCD_WriteRegister(RxModeReg, 0x00);
@@ -154,28 +143,22 @@ void MFRC522::PCD_Init() {
     PCD_WriteRegister(TPrescalerReg, 0xA9);     // TPreScaler = TModeReg[3..0]:TPrescalerReg, ie 0x0A9 = 169 => f_timer=40kHz, ie a timer period of 25μs.
     PCD_WriteRegister(TReloadRegH, 0x03);       // Reload timer with 0x3E8 = 1000, ie 25ms before timeout.
     PCD_WriteRegister(TReloadRegL, 0xE8);
-    
+
     PCD_WriteRegister(TxASKReg, 0x40);      // Default 0x00. Force a 100 % ASK modulation independent of the ModGsPReg register setting
     PCD_WriteRegister(ModeReg, 0x3D);       // Default 0x3F. Set the preset value for the CRC coprocessor for the CalcCRC command to 0x6363 (ISO 14443-3 part 6.2.4)
     PCD_AntennaOn();                        // Enable the antenna driver pins TX1 and TX2 (they were disabled by the reset)
-} // End PCD_Init()
+}
 
-/**
- * Initializes the MFRC522 chip.
- */
-void MFRC522::PCD_Init( uint8_t chipSelectPin,     ///< Arduino pin connected to MFRC522's SPI slave select input (Pin 24, NSS, active low)
-                        uint8_t resetPowerDownPin  ///< Arduino pin connected to MFRC522's reset and power down input (Pin 6, NRSTPD, active low)
-                    ) {
+void MFRC522::PCD_Init(uint8_t chipSelectPin, uint8_t resetPowerDownPin)
+{
     _chipSelectPin = chipSelectPin;
-    _resetPowerDownPin = resetPowerDownPin; 
+    _resetPowerDownPin = resetPowerDownPin;
     // Set the chipSelectPin as digital output, do not select the slave yet
     PCD_Init();
-} // End PCD_Init()
+}
 
-/**
- * Performs a soft reset on the MFRC522 chip and waits for it to be ready again.
- */
-void MFRC522::PCD_Reset() {
+void MFRC522::PCD_Reset()
+{
     PCD_WriteRegister(CommandReg, PCD_SoftReset);   // Issue the SoftReset command.
     // The datasheet does not mention how long the SoftRest command takes to complete.
     // But the MFRC522 might have been in soft power-down mode (triggered by bit 4 of CommandReg) 
@@ -185,75 +168,54 @@ void MFRC522::PCD_Reset() {
         // Wait for the PowerDown bit in CommandReg to be cleared (max 3x50ms)
         delay(50);
     } while ((PCD_ReadRegister(CommandReg) & (1 << 4)) && (++count) < 3);
-} // End PCD_Reset()
+}
 
-/**
- * Turns the antenna on by enabling pins TX1 and TX2.
- * After a reset these pins are disabled.
- */
-void MFRC522::PCD_AntennaOn() {
+void MFRC522::PCD_AntennaOn()
+{
     uint8_t value = PCD_ReadRegister(TxControlReg);
     if ((value & 0x03) != 0x03) {
         PCD_WriteRegister(TxControlReg, value | 0x03);
     }
-} // End PCD_AntennaOn()
+}
 
-/**
- * Turns the antenna off by disabling pins TX1 and TX2.
- */
-void MFRC522::PCD_AntennaOff() {
+void MFRC522::PCD_AntennaOff()
+{
     PCD_ClearRegisterBitMask(TxControlReg, 0x03);
-} // End PCD_AntennaOff()
+}
 
-/**
- * Get the current MFRC522 Receiver Gain (RxGain[2:0]) value.
- * See 9.3.3.6 / table 98 in http://www.nxp.com/documents/data_sheet/MFRC522.pdf
- * NOTE: Return value scrubbed with (0x07<<4)=01110000b as RCFfgReg may use reserved bits.
- * 
- * @return Value of the RxGain, scrubbed to the 3 bits used.
- */
-uint8_t MFRC522::PCD_GetAntennaGain() {
+uint8_t MFRC522::PCD_GetAntennaGain()
+{
     return PCD_ReadRegister(RFCfgReg) & (0x07<<4);
-} // End PCD_GetAntennaGain()
+}
 
-/**
- * Set the MFRC522 Receiver Gain (RxGain) to value specified by given mask.
- * See 9.3.3.6 / table 98 in http://www.nxp.com/documents/data_sheet/MFRC522.pdf
- * NOTE: Given mask is scrubbed with (0x07<<4)=01110000b as RCFfgReg may use reserved bits.
- */
-void MFRC522::PCD_SetAntennaGain(uint8_t mask) {
+void MFRC522::PCD_SetAntennaGain(uint8_t mask)
+{
     if (PCD_GetAntennaGain() != mask) {                     // only bother if there is a change
         PCD_ClearRegisterBitMask(RFCfgReg, (0x07<<4));      // clear needed to allow 000 pattern
         PCD_SetRegisterBitMask(RFCfgReg, mask & (0x07<<4)); // only set RxGain[2:0] bits
     }
-} // End PCD_SetAntennaGain()
+}
 
-/**
- * Performs a self-test of the MFRC522
- * See 16.1.1 in http://www.nxp.com/documents/data_sheet/MFRC522.pdf
- * 
- * @return Whether or not the test passed. Or false if no firmware reference is available.
- */
 bool MFRC522::PCD_PerformSelfTest() {
     // This follows directly the steps outlined in 16.1.1
     // 1. Perform a soft reset.
     PCD_Reset();
-    
+
     // 2. Clear the internal buffer by writing 25 bytes of 00h
     uint8_t ZEROES[25] = {0x00};
     PCD_WriteRegister(FIFOLevelReg, 0x80);      // flush the FIFO buffer
     PCD_WriteRegister(FIFODataReg, 25, ZEROES); // write 25 bytes of 00h to FIFO
     PCD_WriteRegister(CommandReg, PCD_Mem);     // transfer to internal buffer
-    
+
     // 3. Enable self-test
     PCD_WriteRegister(AutoTestReg, 0x09);
-    
+
     // 4. Write 00h to FIFO buffer
     PCD_WriteRegister(FIFODataReg, 0x00);
-    
+
     // 5. Start self-test by issuing the CalcCRC command
     PCD_WriteRegister(CommandReg, PCD_CalcCRC);
-    
+
     // 6. Wait for self-test to complete
     uint8_t n;
     for (uint8_t i = 0; i < 0xFF; i++) {
@@ -270,18 +232,18 @@ bool MFRC522::PCD_PerformSelfTest() {
         }
     }
     PCD_WriteRegister(CommandReg, PCD_Idle);        // Stop calculating CRC for new content in the FIFO.
-    
+
     // 7. Read out resulting 64 bytes from the FIFO buffer.
     uint8_t result[64];
     PCD_ReadRegister(FIFODataReg, 64, result, 0);
-    
+
     // Auto self-test done
     // Reset AutoTestReg register to be 0 again. Required for normal operation.
     PCD_WriteRegister(AutoTestReg, 0x00);
-    
+
     // Determine firmware version (see section 9.3.4.8 in spec)
     uint8_t version = PCD_ReadRegister(VersionReg);
-    
+
     // Pick the appropriate reference values
     const uint8_t *reference;
     switch (version) {
@@ -300,39 +262,38 @@ bool MFRC522::PCD_PerformSelfTest() {
         default:    // Unknown version
             return false; // abort test
     }
-    
+
     // Verify that the results match up to our expectations
     for (uint8_t i = 0; i < 64; i++) {
         if (result[i] != pgm_read_byte(&(reference[i]))) {
             return false;
         }
     }
-    
+
     // Test passed; all is good.
     return true;
-} // End PCD_PerformSelfTest()
-
-/////////////////////////////////////////////////////////////////////////////////////
-// Power control
-/////////////////////////////////////////////////////////////////////////////////////
+}
 
 //IMPORTANT NOTE!!!!
 //Calling any other function that uses CommandReg will disable soft power down mode !!!
 //For more details about power control, refer to the datasheet - page 33 (8.6)
 
-void MFRC522::PCD_SoftPowerDown(){//Note : Only soft power down mode is available throught software
+void MFRC522::PCD_SoftPowerDown()
+{
+    //Note : Only soft power down mode is available throught software
     uint8_t val = PCD_ReadRegister(CommandReg); // Read state of the command register 
     val |= (1<<4);// set PowerDown bit ( bit 4 ) to 1 
     PCD_WriteRegister(CommandReg, val);//write new value to the command register
 }
 
-void MFRC522::PCD_SoftPowerUp(){
+void MFRC522::PCD_SoftPowerUp()
+{
     uint8_t val = PCD_ReadRegister(CommandReg); // Read state of the command register 
     val &= ~(1<<4);// set PowerDown bit ( bit 4 ) to 0 
     PCD_WriteRegister(CommandReg, val);//write new value to the command register
     // wait until PowerDown bit is cleared (this indicates end of wake up procedure) 
     const uint32_t timeout = (uint32_t)millis() + 500;// create timer for timeout (just in case) 
-    
+
     while(millis()<=timeout){ // set timeout to 500 ms 
         val = PCD_ReadRegister(CommandReg);// Read state of the command register
         if(!(val & (1<<4))){ // if powerdown bit is 0 
@@ -340,10 +301,6 @@ void MFRC522::PCD_SoftPowerUp(){
         }
     }
 }
-
-/////////////////////////////////////////////////////////////////////////////////////
-// Functions for communicating with PICCs
-/////////////////////////////////////////////////////////////////////////////////////
 
 /**
  * Executes the Transceive command.
@@ -361,7 +318,7 @@ MFRC522::StatusCode MFRC522::PCD_TransceiveData(    uint8_t *sendData,     ///< 
                                  ) {
     uint8_t waitIRq = 0x30;        // RxIRq and IdleIRq
     return PCD_CommunicateWithPICC(PCD_Transceive, waitIRq, sendData, sendLen, backData, backLen, validBits, rxAlign, checkCRC);
-} // End PCD_TransceiveData()
+}
 
 /**
  * Transfers data to the MFRC522 FIFO, executes a command, waits for completion and transfers data back from the FIFO.
@@ -466,7 +423,7 @@ MFRC522::StatusCode MFRC522::PCD_CommunicateWithPICC(   uint8_t command,       /
 /**
  * Transmits a REQuest command, Type A. Invites PICCs in state IDLE to go to READY and prepare for anticollision or selection. 7 bit frame.
  * Beware: When two PICCs are in the field at the same time I often get STATUS_TIMEOUT - probably due do bad antenna design.
- * 
+ *
  * @return STATUS_OK on success, STATUS_??? otherwise.
  */
 MFRC522::StatusCode MFRC522::PICC_RequestA( uint8_t *bufferATQA,   ///< The buffer to store the ATQA (Answer to request) in
@@ -744,15 +701,10 @@ MFRC522::StatusCode MFRC522::PICC_Select(   Uid *uid,           ///< Pointer to 
     return STATUS_OK;
 } // End PICC_Select()
 
-/**
- * Instructs a PICC in state ACTIVE(*) to go to state HALT.
- *
- * @return STATUS_OK on success, STATUS_??? otherwise.
- */ 
-MFRC522::StatusCode MFRC522::PICC_HaltA() {
-    MFRC522::StatusCode result;
+StatusCode MFRC522::PICC_HaltA() {
+    StatusCode result;
     uint8_t buffer[4];
-    
+
     // Build command buffer
     buffer[0] = PICC_CMD_HLTA;
     buffer[1] = 0;
@@ -761,7 +713,7 @@ MFRC522::StatusCode MFRC522::PICC_HaltA() {
     if (result != STATUS_OK) {
         return result;
     }
-    
+
     // Send the command.
     // The standard says:
     //      If the PICC responds with any modulation during a period of 1 ms after the end of the frame containing the
@@ -775,11 +727,7 @@ MFRC522::StatusCode MFRC522::PICC_HaltA() {
         return STATUS_ERROR;
     }
     return result;
-} // End PICC_HaltA()
-
-/////////////////////////////////////////////////////////////////////////////////////
-// Functions for communicating with MIFARE PICCs
-/////////////////////////////////////////////////////////////////////////////////////
+}
 
 /**
  * Executes the MFRC522 MFAuthent command.
@@ -819,14 +767,11 @@ MFRC522::StatusCode MFRC522::PCD_Authenticate(uint8_t command,     ///< PICC_CMD
     return PCD_CommunicateWithPICC(PCD_MFAuthent, waitIRq, &sendData[0], sizeof(sendData));
 } // End PCD_Authenticate()
 
-/**
- * Used to exit the PCD from its authenticated state.
- * Remember to call this function after communicating with an authenticated PICC - otherwise no new communications can start.
- */
-void MFRC522::PCD_StopCrypto1() {
+void MFRC522::PCD_StopCrypto1()
+{
     // Clear MFCrypto1On bit
     PCD_ClearRegisterBitMask(Status2Reg, 0x08); // Status2Reg[7..0] bits are: TempSensClear I2CForceHS reserved reserved MFCrypto1On ModemState[2:0]
-} // End PCD_StopCrypto1()
+}
 
 /**
  * Reads 16 bytes (+ 2 bytes CRC_A) from the active PICC.
@@ -909,91 +854,58 @@ MFRC522::StatusCode MFRC522::MIFARE_Write(  uint8_t blockAddr, ///< MIFARE Class
     return STATUS_OK;
 } // End MIFARE_Write()
 
-/**
- * Writes a 4 byte page to the active MIFARE Ultralight PICC.
- * 
- * @return STATUS_OK on success, STATUS_??? otherwise.
- */
-MFRC522::StatusCode MFRC522::MIFARE_Ultralight_Write(   uint8_t page,      ///< The page (2-15) to write to.
-                                                        uint8_t *buffer,   ///< The 4 bytes to write to the PICC
-                                                        uint8_t bufferSize ///< Buffer size, must be at least 4 bytes. Exactly 4 bytes are written.
-                                                    ) {
-    MFRC522::StatusCode result;
-    
+StatusCode MFRC522::MIFARE_Ultralight_Write(uint8_t page, uint8_t *buffer, uint8_t bufferSize)
+{
+    StatusCode result;
+
     // Sanity check
     if (buffer == nullptr || bufferSize < 4) {
         return STATUS_INVALID;
     }
-    
+
     // Build commmand buffer
     uint8_t cmdBuffer[6];
     cmdBuffer[0] = PICC_CMD_UL_WRITE;
     cmdBuffer[1] = page;
     memcpy(&cmdBuffer[2], buffer, 4);
-    
+
     // Perform the write
     result = PCD_MIFARE_Transceive(cmdBuffer, 6); // Adds CRC_A and checks that the response is MF_ACK.
     if (result != STATUS_OK) {
         return result;
     }
     return STATUS_OK;
-} // End MIFARE_Ultralight_Write()
+}
 
-/**
- * MIFARE Decrement subtracts the delta from the value of the addressed block, and stores the result in a volatile memory.
- * For MIFARE Classic only. The sector containing the block must be authenticated before calling this function.
- * Only for blocks in "value block" mode, ie with access bits [C1 C2 C3] = [110] or [001].
- * Use MIFARE_Transfer() to store the result in a block.
- * 
- * @return STATUS_OK on success, STATUS_??? otherwise.
- */
-MFRC522::StatusCode MFRC522::MIFARE_Decrement(  uint8_t blockAddr, ///< The block (0-0xff) number.
-                                                int32_t delta       ///< This number is subtracted from the value of block blockAddr.
-                                            ) {
+StatusCode MFRC522::MIFARE_Decrement(uint8_t blockAddr, int32_t delta)
+{
     return MIFARE_TwoStepHelper(PICC_CMD_MF_DECREMENT, blockAddr, delta);
-} // End MIFARE_Decrement()
+}
 
-/**
- * MIFARE Increment adds the delta to the value of the addressed block, and stores the result in a volatile memory.
- * For MIFARE Classic only. The sector containing the block must be authenticated before calling this function.
- * Only for blocks in "value block" mode, ie with access bits [C1 C2 C3] = [110] or [001].
- * Use MIFARE_Transfer() to store the result in a block.
- * 
- * @return STATUS_OK on success, STATUS_??? otherwise.
- */
-MFRC522::StatusCode MFRC522::MIFARE_Increment(  uint8_t blockAddr, ///< The block (0-0xff) number.
-                                                int32_t delta       ///< This number is added to the value of block blockAddr.
-                                            ) {
+StatusCode MFRC522::MIFARE_Increment(uint8_t blockAddr, int32_t delta)
+{
     return MIFARE_TwoStepHelper(PICC_CMD_MF_INCREMENT, blockAddr, delta);
-} // End MIFARE_Increment()
+}
 
-/**
- * MIFARE Restore copies the value of the addressed block into a volatile memory.
- * For MIFARE Classic only. The sector containing the block must be authenticated before calling this function.
- * Only for blocks in "value block" mode, ie with access bits [C1 C2 C3] = [110] or [001].
- * Use MIFARE_Transfer() to store the result in a block.
- * 
- * @return STATUS_OK on success, STATUS_??? otherwise.
- */
-MFRC522::StatusCode MFRC522::MIFARE_Restore(    uint8_t blockAddr ///< The block (0-0xff) number.
-                                            ) {
+StatusCode MFRC522::MIFARE_Restore(uint8_t blockAddr)
+{
     // The datasheet describes Restore as a two step operation, but does not explain what data to transfer in step 2.
     // Doing only a single step does not work, so I chose to transfer 0L in step two.
     return MIFARE_TwoStepHelper(PICC_CMD_MF_RESTORE, blockAddr, 0L);
-} // End MIFARE_Restore()
+}
 
 /**
  * Helper function for the two-step MIFARE Classic protocol operations Decrement, Increment and Restore.
- * 
+ *
  * @return STATUS_OK on success, STATUS_??? otherwise.
  */
-MFRC522::StatusCode MFRC522::MIFARE_TwoStepHelper(  uint8_t command,   ///< The command to use
+StatusCode MFRC522::MIFARE_TwoStepHelper(  uint8_t command,   ///< The command to use
                                                     uint8_t blockAddr, ///< The block (0-0xff) number.
                                                     int32_t data        ///< The data to transfer in step 2
                                                     ) {
-    MFRC522::StatusCode result;
+    StatusCode result;
     uint8_t cmdBuffer[2]; // We only need room for 2 bytes.
-    
+
     // Step 1: Tell the PICC the command and block address
     cmdBuffer[0] = command;
     cmdBuffer[1] = blockAddr;
@@ -1001,28 +913,21 @@ MFRC522::StatusCode MFRC522::MIFARE_TwoStepHelper(  uint8_t command,   ///< The 
     if (result != STATUS_OK) {
         return result;
     }
-    
+
     // Step 2: Transfer the data
     result = PCD_MIFARE_Transceive( (uint8_t *)&data, 4, true); // Adds CRC_A and accept timeout as success.
     if (result != STATUS_OK) {
         return result;
     }
-    
-    return STATUS_OK;
-} // End MIFARE_TwoStepHelper()
 
-/**
- * MIFARE Transfer writes the value stored in the volatile memory into one MIFARE Classic block.
- * For MIFARE Classic only. The sector containing the block must be authenticated before calling this function.
- * Only for blocks in "value block" mode, ie with access bits [C1 C2 C3] = [110] or [001].
- * 
- * @return STATUS_OK on success, STATUS_??? otherwise.
- */
-MFRC522::StatusCode MFRC522::MIFARE_Transfer(   uint8_t blockAddr ///< The block (0-0xff) number.
-                                            ) {
-    MFRC522::StatusCode result;
+    return STATUS_OK;
+}
+
+StatusCode MFRC522::MIFARE_Transfer(uint8_t blockAddr)
+{
+    StatusCode result;
     uint8_t cmdBuffer[2]; // We only need room for 2 bytes.
-    
+
     // Tell the PICC we want to transfer the result into block blockAddr.
     cmdBuffer[0] = PICC_CMD_MF_TRANSFER;
     cmdBuffer[1] = blockAddr;
@@ -1031,24 +936,14 @@ MFRC522::StatusCode MFRC522::MIFARE_Transfer(   uint8_t blockAddr ///< The block
         return result;
     }
     return STATUS_OK;
-} // End MIFARE_Transfer()
+}
 
-/**
- * Helper routine to read the current value from a Value Block.
- * 
- * Only for MIFARE Classic and only for blocks in "value block" mode, that
- * is: with access bits [C1 C2 C3] = [110] or [001]. The sector containing
- * the block must be authenticated before calling this function. 
- * 
- * @param[in]   blockAddr   The block (0x00-0xff) number.
- * @param[out]  value       Current value of the Value Block.
- * @return STATUS_OK on success, STATUS_??? otherwise.
-  */
-MFRC522::StatusCode MFRC522::MIFARE_GetValue(uint8_t blockAddr, int32_t *value) {
+StatusCode MFRC522::MIFARE_GetValue(uint8_t blockAddr, int32_t *value)
+{
     MFRC522::StatusCode status;
     uint8_t buffer[18];
     uint8_t size = sizeof(buffer);
-    
+
     // Read the block
     status = MIFARE_Read(blockAddr, buffer, &size);
     if (status == STATUS_OK) {
@@ -1056,22 +951,12 @@ MFRC522::StatusCode MFRC522::MIFARE_GetValue(uint8_t blockAddr, int32_t *value) 
         *value = (int32_t(buffer[3])<<24) | (int32_t(buffer[2])<<16) | (int32_t(buffer[1])<<8) | int32_t(buffer[0]);
     }
     return status;
-} // End MIFARE_GetValue()
+}
 
-/**
- * Helper routine to write a specific value into a Value Block.
- * 
- * Only for MIFARE Classic and only for blocks in "value block" mode, that
- * is: with access bits [C1 C2 C3] = [110] or [001]. The sector containing
- * the block must be authenticated before calling this function. 
- * 
- * @param[in]   blockAddr   The block (0x00-0xff) number.
- * @param[in]   value       New value of the Value Block.
- * @return STATUS_OK on success, STATUS_??? otherwise.
- */
-MFRC522::StatusCode MFRC522::MIFARE_SetValue(uint8_t blockAddr, int32_t value) {
+StatusCode MFRC522::MIFARE_SetValue(uint8_t blockAddr, int32_t value)
+{
     uint8_t buffer[18];
-    
+
     // Translate the int32_t into 4 bytes; repeated 2x in value block
     buffer[0] = buffer[ 8] = (value & 0xFF);
     buffer[1] = buffer[ 9] = (value & 0xFF00) >> 8;
@@ -1085,79 +970,57 @@ MFRC522::StatusCode MFRC522::MIFARE_SetValue(uint8_t blockAddr, int32_t value) {
     // Address 2x with inverse address 2x
     buffer[12] = buffer[14] = blockAddr;
     buffer[13] = buffer[15] = ~blockAddr;
-    
+
     // Write the whole data block
     return MIFARE_Write(blockAddr, buffer, 16);
-} // End MIFARE_SetValue()
+}
 
-/**
- * Authenticate with a NTAG216.
- * 
- * Only for NTAG216. First implemented by Gargantuanman.
- * 
- * @param[in]   passWord   password.
- * @param[in]   pACK       result success???.
- * @return STATUS_OK on success, STATUS_??? otherwise.
- */
-MFRC522::StatusCode MFRC522::PCD_NTAG216_AUTH(byte* passWord, uint8_t pACK[]) //Authenticate with 32bit password
+StatusCode MFRC522::PCD_NTAG216_AUTH(uint8_t *passWord, uint8_t pACK[]) //Authenticate with 32bit password
 {
     // TODO: Fix cmdBuffer length and rxlength. They really should match.
     //       (Better still, rxlength should not even be necessary.)
 
-    MFRC522::StatusCode result;
+    StatusCode result;
     uint8_t                cmdBuffer[18]; // We need room for 16 bytes data and 2 bytes CRC_A.
-    
+
     cmdBuffer[0] = 0x1B; //Comando de autentificacion
-    
+
     for (uint8_t i = 0; i<4; i++)
         cmdBuffer[i+1] = passWord[i];
-    
+
     result = PCD_CalculateCRC(cmdBuffer, 5, &cmdBuffer[5]);
-    
+
     if (result!=STATUS_OK) {
         return result;
     }
-    
+
     // Transceive the data, store the reply in cmdBuffer[]
     uint8_t waitIRq        = 0x30; // RxIRq and IdleIRq
 //  uint8_t cmdBufferSize  = sizeof(cmdBuffer);
     uint8_t validBits      = 0;
     uint8_t rxlength       = 5;
     result = PCD_CommunicateWithPICC(PCD_Transceive, waitIRq, cmdBuffer, 7, cmdBuffer, &rxlength, &validBits);
-    
+
     pACK[0] = cmdBuffer[0];
     pACK[1] = cmdBuffer[1];
-    
+
     if (result!=STATUS_OK) {
         return result;
     }
-    
+
     return STATUS_OK;
-} // End PCD_NTAG216_AUTH()
+}
 
-
-/////////////////////////////////////////////////////////////////////////////////////
-// Support functions
-/////////////////////////////////////////////////////////////////////////////////////
-
-/**
- * Wrapper for MIFARE protocol communication.
- * Adds CRC_A, executes the Transceive command and checks that the response is MF_ACK or a timeout.
- * 
- * @return STATUS_OK on success, STATUS_??? otherwise.
- */
-MFRC522::StatusCode MFRC522::PCD_MIFARE_Transceive( uint8_t *sendData,     ///< Pointer to the data to transfer to the FIFO. Do NOT include the CRC_A.
-                                                    uint8_t sendLen,       ///< Number of bytes in sendData.
-                                                    bool acceptTimeout  ///< True => A timeout is also success
-                                                ) {
-    MFRC522::StatusCode result;
+StatusCode MFRC522::PCD_MIFARE_Transceive(uint8_t *sendData, uint8_t sendLen, bool acceptTimeout)
+{
+    StatusCode result;
     uint8_t cmdBuffer[18]; // We need room for 16 bytes data and 2 bytes CRC_A.
-    
+
     // Sanity check
     if (sendData == nullptr || sendLen > 16) {
         return STATUS_INVALID;
     }
-    
+
     // Copy sendData[] to cmdBuffer[] and add CRC_A
     memcpy(cmdBuffer, sendData, sendLen);
     result = PCD_CalculateCRC(cmdBuffer, sendLen, &cmdBuffer[sendLen]);
@@ -1165,7 +1028,7 @@ MFRC522::StatusCode MFRC522::PCD_MIFARE_Transceive( uint8_t *sendData,     ///< 
         return result;
     }
     sendLen += 2;
-    
+
     // Transceive the data, store the reply in cmdBuffer[]
     uint8_t waitIRq = 0x30;        // RxIRq and IdleIRq
     uint8_t cmdBufferSize = sizeof(cmdBuffer);
@@ -1185,25 +1048,10 @@ MFRC522::StatusCode MFRC522::PCD_MIFARE_Transceive( uint8_t *sendData,     ///< 
         return STATUS_MIFARE_NACK;
     }
     return STATUS_OK;
-} // End PCD_MIFARE_Transceive()
+}
 
-/**
- * Returns a __FlashStringHelper pointer to a status code name.
- * 
- * @return const __FlashStringHelper *
- */
-const __FlashStringHelper *MFRC522::GetStatusCodeName(MFRC522::StatusCode code  ///< One of the StatusCode enums.
-                                        ) {
-    return MFRC522Debug::GetStatusCodeName(code);
-} // End GetStatusCodeName()
-
-/**
- * Translates the SAK (Select Acknowledge) to a PICC type.
- * 
- * @return PICC_Type
- */
-MFRC522::PICC_Type MFRC522::PICC_GetType(uint8_t sak       ///< The SAK byte returned from PICC_Select().
-                                        ) {
+PICC_Type MFRC522::PICC_GetType(uint8_t sak)
+{
     // http://www.nxp.com/documents/application_note/AN10833.pdf 
     // 3.2 Coding of Select Acknowledge (SAK)
     // ignore 8-bit (iso14443 starts with LSBit = bit 1)
@@ -1222,366 +1070,16 @@ MFRC522::PICC_Type MFRC522::PICC_GetType(uint8_t sak       ///< The SAK byte ret
         case 0x40:  return PICC_TYPE_ISO_18092;
         default:    return PICC_TYPE_UNKNOWN;
     }
-} // End PICC_GetType()
+}
 
-/**
- * Returns a __FlashStringHelper pointer to the PICC type name.
- * 
- * @return const __FlashStringHelper *
- */
-const __FlashStringHelper *MFRC522::PICC_GetTypeName(PICC_Type piccType ///< One of the PICC_Type enums.
-                                                    ) {
-    return MFRC522Debug::PICC_GetTypeName(piccType);
-} // End PICC_GetTypeName()
-
-/**
- * Dumps debug info about the connected PCD to Serial.
- * Shows all known firmware versions
- */
-void MFRC522::PCD_DumpVersionToSerial() {
-    // Get the MFRC522 firmware version
-    uint8_t v = PCD_ReadRegister(VersionReg);
-    Serial.print(F("Firmware Version: 0x"));
-    Serial.print(v, HEX);
-    // Lookup which version
-    switch(v) {
-        case 0x88: Serial.println(F(" = (clone)"));  break;
-        case 0x90: Serial.println(F(" = v0.0"));     break;
-        case 0x91: Serial.println(F(" = v1.0"));     break;
-        case 0x92: Serial.println(F(" = v2.0"));     break;
-        default:   Serial.println(F(" = (unknown)"));
-    }
-    // When 0x00 or 0xFF is returned, communication probably failed
-    if ((v == 0x00) || (v == 0xFF))
-        Serial.println(F("WARNING: Communication failure, is the MFRC522 properly connected?"));
-} // End PCD_DumpVersionToSerial()
-
-/**
- * Dumps debug info about the selected PICC to Serial.
- * On success the PICC is halted after dumping the data.
- * For MIFARE Classic the factory default key of 0xFFFFFFFFFFFF is tried.  
- *
- * @DEPRECATED Kept for bakward compatibility
- */
-void MFRC522::PICC_DumpToSerial(Uid *uid    ///< Pointer to Uid struct returned from a successful PICC_Select().
-                                ) {
-    MIFARE_Key key;
-    
-    // Dump UID, SAK and Type
-    PICC_DumpDetailsToSerial(uid);
-    
-    // Dump contents
-    PICC_Type piccType = PICC_GetType(uid->sak);
-    switch (piccType) {
-        case PICC_TYPE_MIFARE_MINI:
-        case PICC_TYPE_MIFARE_1K:
-        case PICC_TYPE_MIFARE_4K:
-            // All keys are set to FFFFFFFFFFFFh at chip delivery from the factory.
-            for (uint8_t i = 0; i < 6; i++) {
-                key.keyByte[i] = 0xFF;
-            }
-            PICC_DumpMifareClassicToSerial(uid, piccType, &key);
-            break;
-            
-        case PICC_TYPE_MIFARE_UL:
-            PICC_DumpMifareUltralightToSerial();
-            break;
-            
-        case PICC_TYPE_ISO_14443_4:
-        case PICC_TYPE_MIFARE_DESFIRE:
-        case PICC_TYPE_ISO_18092:
-        case PICC_TYPE_MIFARE_PLUS:
-        case PICC_TYPE_TNP3XXX:
-            Serial.println(F("Dumping memory contents not implemented for that PICC type."));
-            break;
-            
-        case PICC_TYPE_UNKNOWN:
-        case PICC_TYPE_NOT_COMPLETE:
-        default:
-            break; // No memory dump here
-    }
-    
-    Serial.println();
-    PICC_HaltA(); // Already done if it was a MIFARE Classic PICC.
-} // End PICC_DumpToSerial()
-
-/**
- * Dumps card info (UID,SAK,Type) about the selected PICC to Serial.
- *
- * @DEPRECATED kept for backward compatibility
- */
-void MFRC522::PICC_DumpDetailsToSerial(Uid *uid ///< Pointer to Uid struct returned from a successful PICC_Select().
-                                    ) {
-    // UID
-    Serial.print(F("Card UID:"));
-    for (uint8_t i = 0; i < uid->size; i++) {
-        if(uid->uidByte[i] < 0x10)
-            Serial.print(F(" 0"));
-        else
-            Serial.print(F(" "));
-        Serial.print(uid->uidByte[i], HEX);
-    } 
-    Serial.println();
-    
-    // SAK
-    Serial.print(F("Card SAK: "));
-    if(uid->sak < 0x10)
-        Serial.print(F("0"));
-    Serial.println(uid->sak, HEX);
-    
-    // (suggested) PICC type
-    PICC_Type piccType = PICC_GetType(uid->sak);
-    Serial.print(F("PICC type: "));
-    Serial.println(PICC_GetTypeName(piccType));
-} // End PICC_DumpDetailsToSerial()
-
-/**
- * Dumps memory contents of a MIFARE Classic PICC.
- * On success the PICC is halted after dumping the data.
- */
-void MFRC522::PICC_DumpMifareClassicToSerial(   Uid *uid,           ///< Pointer to Uid struct returned from a successful PICC_Select().
-                                                PICC_Type piccType, ///< One of the PICC_Type enums.
-                                                MIFARE_Key *key     ///< Key A used for all sectors.
-                                            ) {
-    uint8_t no_of_sectors = 0;
-    switch (piccType) {
-        case PICC_TYPE_MIFARE_MINI:
-            // Has 5 sectors * 4 blocks/sector * 16 bytes/block = 320 bytes.
-            no_of_sectors = 5;
-            break;
-            
-        case PICC_TYPE_MIFARE_1K:
-            // Has 16 sectors * 4 blocks/sector * 16 bytes/block = 1024 bytes.
-            no_of_sectors = 16;
-            break;
-            
-        case PICC_TYPE_MIFARE_4K:
-            // Has (32 sectors * 4 blocks/sector + 8 sectors * 16 blocks/sector) * 16 bytes/block = 4096 bytes.
-            no_of_sectors = 40;
-            break;
-            
-        default: // Should not happen. Ignore.
-            break;
-    }
-    
-    // Dump sectors, highest address first.
-    if (no_of_sectors) {
-        Serial.println(F("Sector Block   0  1  2  3   4  5  6  7   8  9 10 11  12 13 14 15  AccessBits"));
-        for (int8_t i = no_of_sectors - 1; i >= 0; i--) {
-            PICC_DumpMifareClassicSectorToSerial(uid, key, i);
-        }
-    }
-    PICC_HaltA(); // Halt the PICC before stopping the encrypted session.
-    PCD_StopCrypto1();
-} // End PICC_DumpMifareClassicToSerial()
-
-/**
- * Dumps memory contents of a sector of a MIFARE Classic PICC.
- * Uses PCD_Authenticate(), MIFARE_Read() and PCD_StopCrypto1.
- * Always uses PICC_CMD_MF_AUTH_KEY_A because only Key A can always read the sector trailer access bits.
- */
-void MFRC522::PICC_DumpMifareClassicSectorToSerial(Uid *uid,            ///< Pointer to Uid struct returned from a successful PICC_Select().
-                                                    MIFARE_Key *key,    ///< Key A for the sector.
-                                                    uint8_t sector         ///< The sector to dump, 0..39.
-                                                    ) {
-    MFRC522::StatusCode status;
-    uint8_t firstBlock;        // Address of lowest address to dump actually last block dumped)
-    uint8_t no_of_blocks;      // Number of blocks in sector
-    bool isSectorTrailer;   // Set to true while handling the "last" (ie highest address) in the sector.
-    
-    // The access bits are stored in a peculiar fashion.
-    // There are four groups:
-    //      g[3]    Access bits for the sector trailer, block 3 (for sectors 0-31) or block 15 (for sectors 32-39)
-    //      g[2]    Access bits for block 2 (for sectors 0-31) or blocks 10-14 (for sectors 32-39)
-    //      g[1]    Access bits for block 1 (for sectors 0-31) or blocks 5-9 (for sectors 32-39)
-    //      g[0]    Access bits for block 0 (for sectors 0-31) or blocks 0-4 (for sectors 32-39)
-    // Each group has access bits [C1 C2 C3]. In this code C1 is MSB and C3 is LSB.
-    // The four CX bits are stored together in a nible cx and an inverted nible cx_.
-    uint8_t c1, c2, c3;        // Nibbles
-    uint8_t c1_, c2_, c3_;     // Inverted nibbles
-    bool invertedError;     // True if one of the inverted nibbles did not match
-    uint8_t g[4];              // Access bits for each of the four groups.
-    uint8_t group;             // 0-3 - active group for access bits
-    bool firstInGroup;      // True for the first block dumped in the group
-    
-    // Determine position and size of sector.
-    if (sector < 32) { // Sectors 0..31 has 4 blocks each
-        no_of_blocks = 4;
-        firstBlock = sector * no_of_blocks;
-    }
-    else if (sector < 40) { // Sectors 32-39 has 16 blocks each
-        no_of_blocks = 16;
-        firstBlock = 128 + (sector - 32) * no_of_blocks;
-    }
-    else { // Illegal input, no MIFARE Classic PICC has more than 40 sectors.
-        return;
-    }
-        
-    // Dump blocks, highest address first.
-    uint8_t byteCount;
-    uint8_t buffer[18];
-    uint8_t blockAddr;
-    isSectorTrailer = true;
-    invertedError = false;  // Avoid "unused variable" warning.
-    for (int8_t blockOffset = no_of_blocks - 1; blockOffset >= 0; blockOffset--) {
-        blockAddr = firstBlock + blockOffset;
-        // Sector number - only on first line
-        if (isSectorTrailer) {
-            if(sector < 10)
-                Serial.print(F("   ")); // Pad with spaces
-            else
-                Serial.print(F("  ")); // Pad with spaces
-            Serial.print(sector);
-            Serial.print(F("   "));
-        }
-        else {
-            Serial.print(F("       "));
-        }
-        // Block number
-        if(blockAddr < 10)
-            Serial.print(F("   ")); // Pad with spaces
-        else {
-            if(blockAddr < 100)
-                Serial.print(F("  ")); // Pad with spaces
-            else
-                Serial.print(F(" ")); // Pad with spaces
-        }
-        Serial.print(blockAddr);
-        Serial.print(F("  "));
-        // Establish encrypted communications before reading the first block
-        if (isSectorTrailer) {
-            status = PCD_Authenticate(PICC_CMD_MF_AUTH_KEY_A, firstBlock, key, uid);
-            if (status != STATUS_OK) {
-                Serial.print(F("PCD_Authenticate() failed: "));
-                Serial.println(GetStatusCodeName(status));
-                return;
-            }
-        }
-        // Read block
-        byteCount = sizeof(buffer);
-        status = MIFARE_Read(blockAddr, buffer, &byteCount);
-        if (status != STATUS_OK) {
-            Serial.print(F("MIFARE_Read() failed: "));
-            Serial.println(GetStatusCodeName(status));
-            continue;
-        }
-        // Dump data
-        for (uint8_t index = 0; index < 16; index++) {
-            if(buffer[index] < 0x10)
-                Serial.print(F(" 0"));
-            else
-                Serial.print(F(" "));
-            Serial.print(buffer[index], HEX);
-            if ((index % 4) == 3) {
-                Serial.print(F(" "));
-            }
-        }
-        // Parse sector trailer data
-        if (isSectorTrailer) {
-            c1  = buffer[7] >> 4;
-            c2  = buffer[8] & 0xF;
-            c3  = buffer[8] >> 4;
-            c1_ = buffer[6] & 0xF;
-            c2_ = buffer[6] >> 4;
-            c3_ = buffer[7] & 0xF;
-            invertedError = (c1 != (~c1_ & 0xF)) || (c2 != (~c2_ & 0xF)) || (c3 != (~c3_ & 0xF));
-            g[0] = ((c1 & 1) << 2) | ((c2 & 1) << 1) | ((c3 & 1) << 0);
-            g[1] = ((c1 & 2) << 1) | ((c2 & 2) << 0) | ((c3 & 2) >> 1);
-            g[2] = ((c1 & 4) << 0) | ((c2 & 4) >> 1) | ((c3 & 4) >> 2);
-            g[3] = ((c1 & 8) >> 1) | ((c2 & 8) >> 2) | ((c3 & 8) >> 3);
-            isSectorTrailer = false;
-        }
-        
-        // Which access group is this block in?
-        if (no_of_blocks == 4) {
-            group = blockOffset;
-            firstInGroup = true;
-        }
-        else {
-            group = blockOffset / 5;
-            firstInGroup = (group == 3) || (group != (blockOffset + 1) / 5);
-        }
-        
-        if (firstInGroup) {
-            // Print access bits
-            Serial.print(F(" [ "));
-            Serial.print((g[group] >> 2) & 1, DEC); Serial.print(F(" "));
-            Serial.print((g[group] >> 1) & 1, DEC); Serial.print(F(" "));
-            Serial.print((g[group] >> 0) & 1, DEC);
-            Serial.print(F(" ] "));
-            if (invertedError) {
-                Serial.print(F(" Inverted access bits did not match! "));
-            }
-        }
-        
-        if (group != 3 && (g[group] == 1 || g[group] == 6)) { // Not a sector trailer, a value block
-            int32_t value = (int32_t(buffer[3])<<24) | (int32_t(buffer[2])<<16) | (int32_t(buffer[1])<<8) | int32_t(buffer[0]);
-            Serial.print(F(" Value=0x")); Serial.print(value, HEX);
-            Serial.print(F(" Adr=0x")); Serial.print(buffer[12], HEX);
-        }
-        Serial.println();
-    }
-    
-    return;
-} // End PICC_DumpMifareClassicSectorToSerial()
-
-/**
- * Dumps memory contents of a MIFARE Ultralight PICC.
- */
-void MFRC522::PICC_DumpMifareUltralightToSerial() {
-    MFRC522::StatusCode status;
-    uint8_t byteCount;
-    uint8_t buffer[18];
-    uint8_t i;
-    
-    Serial.println(F("Page  0  1  2  3"));
-    // Try the mpages of the original Ultralight. Ultralight C has more pages.
-    for (uint8_t page = 0; page < 16; page +=4) { // Read returns data for 4 pages at a time.
-        // Read pages
-        byteCount = sizeof(buffer);
-        status = MIFARE_Read(page, buffer, &byteCount);
-        if (status != STATUS_OK) {
-            Serial.print(F("MIFARE_Read() failed: "));
-            Serial.println(GetStatusCodeName(status));
-            break;
-        }
-        // Dump data
-        for (uint8_t offset = 0; offset < 4; offset++) {
-            i = page + offset;
-            if(i < 10)
-                Serial.print(F("  ")); // Pad with spaces
-            else
-                Serial.print(F(" ")); // Pad with spaces
-            Serial.print(i);
-            Serial.print(F("  "));
-            for (uint8_t index = 0; index < 4; index++) {
-                i = 4 * offset + index;
-                if(buffer[i] < 0x10)
-                    Serial.print(F(" 0"));
-                else
-                    Serial.print(F(" "));
-                Serial.print(buffer[i], HEX);
-            }
-            Serial.println();
-        }
-    }
-} // End PICC_DumpMifareUltralightToSerial()
-
-/**
- * Calculates the bit pattern needed for the specified access bits. In the [C1 C2 C3] tuples C1 is MSB (=4) and C3 is LSB (=1).
- */
-void MFRC522::MIFARE_SetAccessBits( uint8_t *accessBitBuffer,  ///< Pointer to byte 6, 7 and 8 in the sector trailer. Bytes [0..2] will be set.
-                                    uint8_t g0,                ///< Access bits [C1 C2 C3] for block 0 (for sectors 0-31) or blocks 0-4 (for sectors 32-39)
-                                    uint8_t g1,                ///< Access bits C1 C2 C3] for block 1 (for sectors 0-31) or blocks 5-9 (for sectors 32-39)
-                                    uint8_t g2,                ///< Access bits C1 C2 C3] for block 2 (for sectors 0-31) or blocks 10-14 (for sectors 32-39)
-                                    uint8_t g3                 ///< Access bits C1 C2 C3] for the sector trailer, block 3 (for sectors 0-31) or block 15 (for sectors 32-39)
-                                ) {
+void MFRC522::MIFARE_SetAccessBits(uint8_t *accessBitBuffer, uint8_t g0, uint8_t g1, uint8_t g2, uint8_t g3)
+{
     uint8_t c1 = ((g3 & 4) << 1) | ((g2 & 4) << 0) | ((g1 & 4) >> 1) | ((g0 & 4) >> 2);
     uint8_t c2 = ((g3 & 2) << 2) | ((g2 & 2) << 1) | ((g1 & 2) << 0) | ((g0 & 2) >> 1);
     uint8_t c3 = ((g3 & 1) << 3) | ((g2 & 1) << 2) | ((g1 & 1) << 1) | ((g0 & 1) << 0);
-    
+
     accessBitBuffer[0] = (~c2 & 0xF) << 4 | (~c1 & 0xF);
     accessBitBuffer[1] =          c1 << 4 | (~c3 & 0xF);
     accessBitBuffer[2] =          c3 << 4 | c2;
-} // End MIFARE_SetAccessBits()
+}
 } /* namespace MFRC */
