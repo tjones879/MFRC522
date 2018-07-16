@@ -175,7 +175,7 @@ public:
     MFRC522() : MFRC522(UNUSED_PIN, UNUSED_PIN) {};
 
     /**
-     * @brief Writes a byte to the specified register in the MFRC522 chip.
+     * Writes a byte to the specified register in the MFRC522 chip.
      *
      * The interface is described in the datasheet section 8.1.2.
      * @param reg   The register to write to.
@@ -184,7 +184,7 @@ public:
     void PCD_WriteRegister(PCDRegister reg, uint8_t value);
 
     /**
-     * @brief Writes a number of bytes to the specified register in the MFRC522 chip.
+     * Writes a number of bytes to the specified register in the MFRC522 chip.
      *
      * The interface is described in the datasheet section 8.1.2.
      * @param reg    The register to write to. One of the PCDRegister enums.
@@ -194,7 +194,7 @@ public:
     void PCD_WriteRegister(PCDRegister reg, uint8_t count, uint8_t *values);
 
     /**
-     * @brief Reads a byte from the specified register in the MFRC522 chip.
+     * Reads a byte from the specified register in the MFRC522 chip.
      *
      * The interface is described in the datasheet section 8.1.2.
      * @param reg The register to read from.
@@ -202,7 +202,7 @@ public:
     uint8_t PCD_ReadRegister(PCDRegister reg);
 
     /**
-     * @brief Reads a number of bytes from the specified register in the MFRC522 chip.
+     * Reads a number of bytes from the specified register in the MFRC522 chip.
      *
      * The interface is described in the datasheet section 8.1.2.
      * @param reg The register to read from.
@@ -213,7 +213,7 @@ public:
     void PCD_ReadRegister(PCDRegister reg, uint8_t count, uint8_t *values, uint8_t rxAlign = 0);
 
     /**
-     * @brief Perform a bitwise OR on the given register.
+     * Perform a bitwise OR on the given register.
      *
      * @param reg  The register to update.
      * @param mask The bitwise OR mask to update the register.
@@ -221,7 +221,7 @@ public:
     void PCD_SetRegisterBitMask(PCDRegister reg, uint8_t mask);
 
     /**
-     * @brief Clears the bits given in mask from register reg.
+     * Clears the bits given in mask from register reg.
      *
      * @param reg  The register that will be updated.
      * @param mask The bitmask that will be cleared from reg.
@@ -229,7 +229,7 @@ public:
     void PCD_ClearRegisterBitMask(PCDRegister reg, uint8_t mask);
 
     /**
-     * @brief Use the CRC coprocessor in the MFRC522 to calculate a CRC_A.
+     * Use the CRC coprocessor in the MFRC522 to calculate a CRC_A.
      *
      * @param data    Pointer to the data to transfer to the FIFO for CRC calculation.
      * @param length  The number of bytes to transfer.
@@ -239,12 +239,12 @@ public:
     StatusCode PCD_CalculateCRC(uint8_t *data, uint8_t length, uint8_t *result);
 
     /**
-     * @brief Initialize the MFRC522 chip.
+     * Initialize the MFRC522 chip.
      */
     void PCD_Init();
 
     /**
-     * @brief Initialize the MFRC522 chip.
+     * Initialize the MFRC522 chip.
      *
      * @param chipSelectPin      Arduino pin connected to MFRC522's SPI slave select input (Pin 24, NSS, active low)
      * @param resetPowerDownPin  Arduino pin connected to MFRC522's reset and power down input (Pin 6, NRSTPD, active low)
@@ -252,7 +252,7 @@ public:
     void PCD_Init(uint8_t chipSelectPin, uint8_t resetPowerDownPin);
 
     /**
-     * @brief Perform a soft reset on the MFRC522 chip and wait for it to be ready again.
+     * Perform a soft reset on the MFRC522 chip and wait for it to be ready again.
      */
     void PCD_Reset();
 
@@ -416,7 +416,7 @@ public:
     StatusCode PCD_NTAG216_AUTH(uint8_t *passWord, uint8_t pACK[]);
 
     /**
-     * @brief Wrapper for MIFARE protocol communication.
+     * Wrapper for MIFARE protocol communication.
      *
      * Adds CRC_A, executes the Transceive command and checks that the response is MF_ACK or a timeout.
      *     ///< Pointer to the data to transfer to the FIFO. Do NOT include the CRC_A.
@@ -428,14 +428,14 @@ public:
     StatusCode PCD_MIFARE_Transceive(uint8_t *sendData, uint8_t sendLen, bool acceptTimeout = false);
 
     /**
-     * @brief Translates the SAK (Select Acknowledge) to a PICC type.
+     * Translates the SAK (Select Acknowledge) to a PICC type.
      *
      * @param sak The SAK byte returned from PICC_Select().
      */
     PICC_Type PICC_GetType(uint8_t sak);
 
     /**
-     * @brief Calculate the bit pattern needed for the specified access bits.
+     * Calculate the bit pattern needed for the specified access bits.
      *
      * In the [C1 C2 C3] tuples C1 is MSB (=4) and C3 is LSB (=1).
      * @param accessBitBuffer  Pointer to byte 6, 7 and 8 in the sector trailer. Bytes [0..2] will be set.
