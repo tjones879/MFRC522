@@ -286,7 +286,7 @@ public:
     /**
      * Performs a self-test of the MFRC522
      * See 16.1.1 in http://www.nxp.com/documents/data_sheet/MFRC522.pdf
-     * 
+     *
      * @return Whether or not the test passed. Or false if no firmware reference is available.
      */
     bool PCD_PerformSelfTest();
@@ -294,14 +294,89 @@ public:
     void PCD_SoftPowerDown();
     void PCD_SoftPowerUp();
 
-    /////////////////////////////////////////////////////////////////////////////////////
-    // Functions for communicating with PICCs
-    /////////////////////////////////////////////////////////////////////////////////////
+    /**
+     * Executes the Transceive command.
+     *
+     * CRC validation can only be done if backData and backLen are specified.
+     *
+     * @param sendData   Pointer to the data to transfer to the FIFO.
+     * @param sendLen    Number of bytes to transfer to the FIFO.
+     * @param backData   nullptr or pointer to buffer if data should be read back after executing the command.
+     * @param backLen    In: Max number of bytes to write to *backData. Out: The number of bytes returned.
+     * @param validBits  In/Out: The number of valid bits in the last byte. 0 for 8 valid bits. Default nullptr.
+     * @param rxAlign    In: Defines the bit position in backData[0] for the first bit received. Default 0.
+     * @param checkCRC   In: True => The last two bytes of the response is assumed to be a CRC_A that must be validated.
+     *
+     * @return STATUS_OK on success, STATUS_??? otherwise.
+     */
     StatusCode PCD_TransceiveData(uint8_t *sendData, uint8_t sendLen, uint8_t *backData, uint8_t *backLen, uint8_t *validBits = nullptr, uint8_t rxAlign = 0, bool checkCRC = false);
+
+    /**
+     * Transfers data to the MFRC522 FIFO, executes a command, waits for completion and transfers data back from the FIFO.
+     *
+     * CRC validation can only be done if backData and backLen are specified.
+     *
+     * @param command    The command to execute. One of the PCD_Command enums.
+     * @param waitIRq    The bits in the ComIrqReg register that signals successful completion of the command.
+     * @param sendData   Pointer to the data to transfer to the FIFO.
+     * @param sendLen    Number of bytes to transfer to the FIFO.
+     * @param backData   nullptr or pointer to buffer if data should be read back after executing the command.
+     * @param backLen    In: Max number of bytes to write to *backData. Out: The number of bytes returned.
+     * @param validBits  In/Out: The number of valid bits in the last byte. 0 for 8 valid bits.
+     * @param rxAlign    In: Defines the bit position in backData[0] for the first bit received. Default 0.
+     * @param checkCRC   In: True => The last two bytes of the response is assumed to be a CRC_A that must be validated.
+     *
+     * @return STATUS_OK on success, STATUS_??? otherwise.
+     */
     StatusCode PCD_CommunicateWithPICC(uint8_t command, uint8_t waitIRq, uint8_t *sendData, uint8_t sendLen, uint8_t *backData = nullptr, uint8_t *backLen = nullptr, uint8_t *validBits = nullptr, uint8_t rxAlign = 0, bool checkCRC = false);
+
+    /**
+     * Transmits a REQuest command, Type A. Invites PICCs in state IDLE to go to READY and prepare for anticollision or selection. 7 bit frame.
+     * Beware: When two PICCs are in the field at the same time I often get STATUS_TIMEOUT - probably due do bad antenna design.
+     *
+     * @return STATUS_OK on success, STATUS_??? otherwise.
+     */
     StatusCode PICC_RequestA(uint8_t *bufferATQA, uint8_t *bufferSize);
+
+    /**
+     * Transmits a Wake-UP command, Type A. Invites PICCs in state IDLE and HALT to go to READY(*) and prepare for anticollision or selection. 7 bit frame.
+     * Beware: When two PICCs are in the field at the same time I often get STATUS_TIMEOUT - probably due do bad antenna design.
+     *
+     * @return STATUS_OK on success, the appropriate status otherwise.
+     */
     StatusCode PICC_WakeupA(uint8_t *bufferATQA, uint8_t *bufferSize);
+
+    /**
+     * Transmits REQA or WUPA commands.
+     * Beware: When two PICCs are in the field at the same time I often get STATUS_TIMEOUT - probably due do bad antenna design.
+     *
+     * @param command     The command to send PICC_CMD_REQA or PICC_CMD_WUPA
+     * @param bufferATQA  The buffer to store the ATQA.
+     * @param bufferSize  The buffer size, at least 2 bytes.
+     *                    This is also the number of bytes returned if STATU_OK.
+     * @return            STATUS_OK on success, the appropriate status otherwise.
+     */
     StatusCode PICC_REQA_or_WUPA(uint8_t command, uint8_t *bufferATQA, uint8_t *bufferSize);
+
+    /**
+     * Transmits SELECT/ANTICOLLISION commands to select a single PICC.
+     * Before calling this function the PICCs must be placed in the READY(*) state by calling PICC_RequestA() or PICC_WakeupA().
+     * On success:
+     *      - The chosen PICC is in state ACTIVE(*) and all other PICCs have returned to state IDLE/HALT. (Figure 7 of the ISO/IEC 14443-3 draft.)
+     *      - The UID size and value of the chosen PICC is returned in *uid along with the SAK.
+     *
+     * A PICC UID consists of 4, 7 or 10 bytes.
+     * Only 4 bytes can be specified in a SELECT command, so for the longer UIDs two or three iterations are used:
+     *      UID size    Number of UID bytes     Cascade levels      Example of PICC
+     *      ========    ===================     ==============      ===============
+     *      single               4                      1               MIFARE Classic
+     *      double               7                      2               MIFARE Ultralight
+     *      triple              10                      3               Not currently in use?
+     *
+     * @param validBits  The number of known UID bits supplied in uid. If set,
+     *                   you must also supply uid->size.
+     * @return           STATUS_OK on success, STATUS_??? otherwise.
+     */
     virtual StatusCode PICC_Select(Uid *uid, uint8_t validBits = 0);
 
     /**
