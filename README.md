@@ -1,5 +1,14 @@
 # MFRC522
 
+The MFRC522 is a 13.56 MHz contactless reader/writer IC. It supports
+working with ISO/IEC 14443 A/MIFARE and NTAG. Officially, this chip
+supports SPI/UART/I2C connectivity to a host microcontroller. However,
+most cheap MFRC522 modules found online for hobbiests are limited to
+a single SPI connection.
+
+The official MFRC522 [datasheet](https://www.nxp.com/docs/en/data-sheet/MFRC522.pdf)
+can be found on NXP's website.
+
 This is a modern C++ library for the contactless reader/writer MFRC522 chips.
 This library is written to use libopencm3 and FreeRTOS and is agnostic with
 respect to the host microcontroller being ran on. However, it is fairly easy
@@ -7,7 +16,7 @@ to port to different a different HAL or RTOS if desired. Instructions for
 doing so can be found below.
 
 
-### Usage
+Usage
 ---------
 
 There are two options for including this library with your code:
@@ -21,13 +30,13 @@ There are two options for including this library with your code:
    within the submodule folder.
 
 
-### Documentation
+Documentation
 -----------------
 
 
-### Porting
+Porting
 -----------
 
 
-### Contributions
+Contributions
 -----------------

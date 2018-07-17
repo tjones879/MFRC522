@@ -4,7 +4,7 @@
 #include <Arduino.h> // TODO: Replace arduino libraries
 #include <SPI.h>     // TODO: Replace SPI interface
 
-namespace MRFC {
+namespace MFRC {
 enum class PCDRegister : uint8_t {
     // Page 0: Command and status
     CommandReg              = 0x01 << 1,    // starts and stops command execution
