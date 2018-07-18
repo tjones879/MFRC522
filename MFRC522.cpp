@@ -3,65 +3,57 @@ namespace MFRC {
 
 void MFRC522::PCD_WriteRegister(PCDRegister reg, uint8_t value)
 {
-    _spiClass->beginTransaction(_spiSettings);  // Set the settings to work with SPI bus
-    digitalWrite(_chipSelectPin, LOW);      // Select slave
-    _spiClass->transfer(reg);                       // MSB == 0 is for writing. LSB is not used in address. Datasheet section 8.1.2.3.
-    _spiClass->transfer(value);
-    digitalWrite(_chipSelectPin, HIGH);     // Release slave again
-    _spiClass->endTransaction(); // Stop using the SPI bus
+    _spi.nssLow();
+    _spi.send(reg);
+    _spi.send(value);
+    _spi.nssHigh();
 }
 
 void MFRC522::PCD_WriteRegister(PCDRegister reg, uint8_t count, uint8_t *values)
 {
-    _spiClass->beginTransaction(_spiSettings);  // Set the settings to work with SPI bus
-    digitalWrite(_chipSelectPin, LOW);      // Select slave
-    _spiClass->transfer(reg);                       // MSB == 0 is for writing. LSB is not used in address. Datasheet section 8.1.2.3.
-    for (uint8_t index = 0; index < count; index++) {
-        _spiClass->transfer(values[index]);
-    }
-    digitalWrite(_chipSelectPin, HIGH);     // Release slave again
-    _spiClass->endTransaction(); // Stop using the SPI bus
+    _spi.setLow()(_spi);
+    _spi.send(reg);
+    for (auto i = 0; i < count; i++)
+        _spi.send(values[index]);
+
+    _spi.nssHigh();
 }
 
 uint8_t MFRC522::PCD_ReadRegister(PCDRegister reg)
 {
     uint8_t value;
-    _spiClass->beginTransaction(_spiSettings);  // Set the settings to work with SPI bus
-    digitalWrite(_chipSelectPin, LOW);          // Select slave
-    _spiClass->transfer(0x80 | reg);                    // MSB == 1 is for reading. LSB is not used in address. Datasheet section 8.1.2.3.
-    value = _spiClass->transfer(0);                 // Read the value back. Send 0 to stop reading.
-    digitalWrite(_chipSelectPin, HIGH);         // Release slave again
-    _spiClass->endTransaction(); // Stop using the SPI bus
+    _spi.setLow()(_spi);
+    value = _spi.transfer(readReg(reg)) & 0xFF; // MSB := 1 for reading. LSB is not used in address. See 8.1.2.3.
+    _spi.send(0); // Send 0 to stop reading.
+    _spi.nssHigh();
     return value;
 }
 
 void MFRC522::PCD_ReadRegister(PCDRegister reg, uint8_t count, uint8_t *values, uint8_t rxAlign)
 {
-    if (count == 0) {
+    if (!count)
         return;
-    }
-    uint8_t address = 0x80 | reg;              // MSB == 1 is for reading. LSB is not used in address. Datasheet section 8.1.2.3.
-    uint8_t index = 0;                         // Index in values array.
-    _spiClass->beginTransaction(_spiSettings);  // Set the settings to work with SPI bus
-    digitalWrite(_chipSelectPin, LOW);      // Select slave
-    count--;                                // One read is performed outside of the loop
-    _spiClass->transfer(address);                   // Tell MFRC522 which address we want to read
-    if (rxAlign) {      // Only update bit positions rxAlign..7 in values[0]
-        // Create bit mask for bit positions rxAlign..7
+
+    uint8_t address = readReg(reg);
+    uint8_t index = 0;
+    _spi.nssLow();
+    count--;
+    _spi.send(address);
+
+    if (rxAlign) {
         uint8_t mask = (0xFF << rxAlign) & 0xFF;
-        // Read value and tell that we want to read the same address again.
-        uint8_t value = _spiClass->transfer(address);
-        // Apply mask to both current value of values[0] and the new data in value.
+        uint8_t value = _spi.transfer(address);
         values[0] = (values[0] & ~mask) | (value & mask);
         index++;
     }
-    while (index < count) {
-        values[index] = _spiClass->transfer(address);   // Read value and tell that we want to read the same address again.
+
+    for (index; index < count; index++) {
+        values[index] = _spi->transfer(address);
         index++;
     }
-    values[index] = _spiClass->transfer(0);         // Read the final byte. Send 0 to stop reading.
-    digitalWrite(_chipSelectPin, HIGH);         // Release slave again
-    _spiClass->endTransaction(); // Stop using the SPI bus
+
+    values[index] = _spi->transfer(address);
+    _spi.nssHigh();
 }
 
 void MFRC522::PCD_SetRegisterBitMask(PCDRegister reg, uint8_t mask)
@@ -1010,5 +1002,16 @@ void MFRC522::MIFARE_SetAccessBits(uint8_t *accessBitBuffer, uint8_t g0, uint8_t
     accessBitBuffer[0] = (~c2 & 0xF) << 4 | (~c1 & 0xF);
     accessBitBuffer[1] =          c1 << 4 | (~c3 & 0xF);
     accessBitBuffer[2] =          c3 << 4 | c2;
+}
+
+
+uint8_t MFRC522::readReg(uint8_t reg)
+{
+    return 0x80 | reg;
+}
+
+uint8_t MFRC522::writeReg(uint8_t reg)
+{
+    return reg;
 }
 } /* namespace MFRC */

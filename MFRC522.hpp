@@ -2,9 +2,9 @@
 
 #include <stdint.h>
 #include <Arduino.h> // TODO: Replace arduino libraries
-#include <SPI.h>     // TODO: Replace SPI interface
 
 namespace MFRC {
+
 enum class PCDRegister : uint8_t {
     // Page 0: Command and status
     CommandReg              = 0x01 << 1,    // starts and stops command execution
@@ -163,13 +163,14 @@ struct MifareKey {
     std::array<uint8_t, MF_KEY_SIZE> key;
 };
 
+template <class SPI>
 class MFRC522 {
 public:
     // Member variables
     Uid uid;    // Used by PICC_ReadCardSerial().
 
     MFRC522(const uint8_t chipSelectPin, const uint8_t resetPowerDownPin,
-            SPIClass *spiClass = &SPI, const SPISettings spiSettings = SPISettings(SPI_CLOCK_DIV4, MSBFIRST, SPI_MODE0))
+            SPI spiClass, const SPISettings spiSettings = SPISettings(SPI_CLOCK_DIV4, MSBFIRST, SPI_MODE0))
             : _chipSelectPin(chipSelectPin), _resetPowerDownPin(resetPowerDownPin),
               _spiClass(spiClass), _spiSettings(spiSettings) {};
     MFRC522() : MFRC522(UNUSED_PIN, UNUSED_PIN) {};
@@ -526,10 +527,22 @@ protected:
     uint8_t _resetPowerDownPin;    // Arduino pin connected to MFRC522's reset and power down input (Pin 6, NRSTPD, active low)
 
     // SPI communication
-    SPIClass *_spiClass;        // SPI class which abstracts hardware.
+    SPI device;
     const SPISettings _spiSettings; // SPI settings.
 
     // Functions for communicating with MIFARE PICCs
     StatusCode MIFARE_TwoStepHelper(uint8_t command, uint8_t blockAddr, int32_t data);
+    /**
+     * Automatically convert the given register address to be recognized as a readable location.
+     *
+     * @param reg  Register address to eventually be read.
+     */
+    uint8_t readReg(uint8_t reg);
+    /**
+     * Automatically convert the given register address to be recognized as a writable location.
+     *
+     * @param reg  Register address to eventually be written to.
+     */
+    uint8_t writeReg(uint8_t reg);
 };
 } /* namespace MFRC */
