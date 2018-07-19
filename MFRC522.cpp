@@ -11,7 +11,7 @@ void MFRC522::PCD_WriteRegister(PCDRegister reg, uint8_t value)
 
 void MFRC522::PCD_WriteRegister(PCDRegister reg, uint8_t count, uint8_t *values)
 {
-    _spi.setLow()(_spi);
+    _spi.nssLow();
     _spi.send(reg);
     for (auto i = 0; i < count; i++)
         _spi.send(values[index]);
@@ -22,7 +22,7 @@ void MFRC522::PCD_WriteRegister(PCDRegister reg, uint8_t count, uint8_t *values)
 uint8_t MFRC522::PCD_ReadRegister(PCDRegister reg)
 {
     uint8_t value;
-    _spi.setLow()(_spi);
+    _spi.nssLow();
     value = _spi.transfer(readReg(reg)) & 0xFF; // MSB := 1 for reading. LSB is not used in address. See 8.1.2.3.
     _spi.send(0); // Send 0 to stop reading.
     _spi.nssHigh();
@@ -48,11 +48,11 @@ void MFRC522::PCD_ReadRegister(PCDRegister reg, uint8_t count, uint8_t *values, 
     }
 
     for (index; index < count; index++) {
-        values[index] = _spi->transfer(address);
+        values[index] = _spi.transfer(address);
         index++;
     }
 
-    values[index] = _spi->transfer(address);
+    values[index] = _spi.transfer(address);
     _spi.nssHigh();
 }
 
